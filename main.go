@@ -133,12 +133,28 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 			*/
 			calculate_pixel(img, res, x, y)
 		}
-		//fmt.Println(y)
+
+		if y%100 == 0 {
+			perc := -(-res/2 - y) / (res / 100)
+
+			percBar := ""
+
+			for i := 0; i < 15; i++ {
+				if int((float64(perc)/100.0)*15.0) > i {
+					percBar += "="
+				} else {
+					percBar += " "
+				}
+			}
+
+			fmt.Printf("\r [%v]  %v%v ", percBar, perc, "%")
+		}
+
 	}
 
 	png.Encode(w, img)
 
-	fmt.Printf("set generation took %v\n", time.Since(start))
+	fmt.Printf("\nset generation took %v\n", time.Since(start))
 }
 
 func main() {
