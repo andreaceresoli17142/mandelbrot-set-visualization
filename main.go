@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/png"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 )
@@ -15,6 +16,7 @@ var (
 	zoom    = 0.05
 	xoffset = 0.4
 	yoffset = 0.37
+	iter    = 1000
 )
 
 func calcColor(col uint64) color.RGBA {
@@ -36,22 +38,11 @@ func mapValue(imin float64, imax float64, omin float64, omax float64, value floa
 }
 
 func pageMain(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte(`
-			<!doctype html>
-			<title>madelbrot set</title>
-
-			<style>
-				#image-id {
-				max-width: 85vw;
-					max-height: 85vh;
-				}
-			</style>
-
-			<center>
-				<h1>madelbrot set</h1>
-				<img src="/madelbrot.png" id="image-id">
-			</center>
-			`))
+	file, err := os.ReadFile("index.html")
+	if err != nil {
+		fmt.Printf("Error reading the files: %v", err)
+	}
+	w.Write(file)
 }
 
 func uint8Clamper(mini float64, maxi float64, value float64) uint8 {
@@ -69,23 +60,25 @@ func calculate_pixel(img *image.RGBA, res int, x int, y int) {
 
 	var i int
 
-	for Za*Za+Zb*Zb < 4 && i < 1000 {
-		TZa := (Za * Za) - (Zb * Zb) + Ca
-		TZb := (2 * Za * Zb) + Cb
-		Za = TZa
-		Zb = TZb
+	for Za*Za+Zb*Zb < 4 && i < iter {
+		Za, Zb = (Za*Za)-(Zb*Zb)+Ca, (2*Za*Zb)+Cb
 		i++
 	}
 
 	col := color.RGBA{
 		R: 0,
-		G: uint8Clamper(0, 1000.0, float64(i)),
+		G: uint8Clamper(0, float64(iter), float64(i)),
 		B: 0,
 		A: 255,
 	}
 
 	img.Set((res/2)+x, (res/2)+y, col)
 	//fmt.Println("finished to calculate: ", x, y)
+}
+
+func loadingImage(w http.ResponseWriter, r *http.Request) {
+	ret, _ := os.ReadFile("loading.png")
+	w.Write(ret)
 }
 
 func pageImage(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +115,13 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 	img := image.NewRGBA(image.Rect(0, 0, res, res))
 
 	fmt.Println("starting to generate image")
+
+	fmt.Println("ofx: ", -zoom+xoffset, zoom+xoffset)
+	fmt.Println("ofx: ", -zoom+yoffset, zoom+yoffset)
+
 	start := time.Now()
+
+	//iter = int(mapValue(1, 0, 0, 1000, zoom))
 
 	for y := -res / 2; y < res/2; y++ {
 		for x := -res / 2; x < res/2; x++ {
@@ -134,6 +133,7 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 			calculate_pixel(img, res, x, y)
 		}
 
+		// print progress bar
 		if y%100 == 0 {
 			perc := -(-res/2 - y) / (res / 100)
 
@@ -152,6 +152,8 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 
 	}
 
+	fmt.Print("\r [===============]  100%")
+
 	png.Encode(w, img)
 
 	fmt.Printf("\nset generation took %v\n", time.Since(start))
@@ -159,7 +161,8 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/", pageMain)
-	http.HandleFunc("/madelbrot.png", pageImage)
+	http.HandleFunc("/mandelbrot.png", pageImage)
+	http.HandleFunc("/loading.png", loadingImage)
 	fmt.Println("Listening on http://localhost:3000/")
 	err := http.ListenAndServe(":3000", nil)
 	if err != nil {

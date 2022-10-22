@@ -1,0 +1,76 @@
+<!doctype html>
+
+<head>
+    <title>madelbrot set</title>
+
+
+    <style>
+        .img {
+            max-width: 85vw;
+            max-height: 85vh;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <script>
+        var res = 1000
+        var zoom = 1
+        var xoffs = -0.5
+        var yoffs = 0
+        var setimg
+        var loadFlag = false
+
+        window.onload = () => {
+            setimg = document.getElementById("set_img")
+            setimg.src = imgURL()
+            setimg.onload = () => {
+                loadFlag = false
+            }
+        }
+
+
+        function imgURL() {
+            return "/mandelbrot.png?res="+res+"&zoom="+zoom+"&xoffs="+xoffs+"&yoffs="+yoffs
+        }
+
+        function mapValue( imin, imax, omin, omax, value ) {
+            x = (value - imin) / (imax - imin)
+            return x*(omax-omin) + omin
+        }
+
+
+        function clickHotspotImage(event) {
+
+
+            if (loadFlag) {
+                return
+            }
+
+            loadFlag = true
+
+            var xCoordinate = event.offsetX
+            var yCoordinate = event.offsetY
+
+            xCoordinate = mapValue(0, res, -res/2, res/2, xCoordinate)
+            yCoordinate = mapValue(0, res, -res/2, res/2, yCoordinate)
+
+            xoffs = mapValue(-res/2, res/2, -zoom+xoffs, zoom+xoffs, xCoordinate)
+            yoffs = mapValue(-res/2, res/2, -zoom+yoffs, zoom+yoffs, yCoordinate)
+
+            zoom = zoom/2
+
+            setimg.src = imgURL()
+        }
+
+
+
+    </script>
+
+    <center>
+        <h1>mandelbrot set</h1>
+        <img id="set_img" src="/loading.png" onclick="clickHotspotImage(event);" alt="image is broke">
+    </center>
+</body>
