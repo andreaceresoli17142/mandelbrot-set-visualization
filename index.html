@@ -3,20 +3,17 @@
 <head>
     <title>madelbrot set</title>
 
-
     <style>
-        .img {
+        img {
             max-width: 85vw;
             max-height: 85vh;
         }
     </style>
-
 </head>
 
 <body>
-
     <script>
-        var res = 1000
+        var res = 2000
         var zoom = 1
         var xoffs = -0.5
         var yoffs = 0
@@ -31,7 +28,6 @@
             }
         }
 
-
         function imgURL() {
             return "/mandelbrot.png?res="+res+"&zoom="+zoom+"&xoffs="+xoffs+"&yoffs="+yoffs
         }
@@ -41,9 +37,7 @@
             return x*(omax-omin) + omin
         }
 
-
         function clickHotspotImage(event) {
-
 
             if (loadFlag) {
                 return
@@ -54,8 +48,15 @@
             var xCoordinate = event.offsetX
             var yCoordinate = event.offsetY
 
-            xCoordinate = mapValue(0, res, -res/2, res/2, xCoordinate)
-            yCoordinate = mapValue(0, res, -res/2, res/2, yCoordinate)
+            var imgSize = setimg.width
+
+            console.log("offset: " + xCoordinate + ", "+yCoordinate)
+
+            xCoordinate = mapValue(0, imgSize, -res/2, res/2, xCoordinate)
+            yCoordinate = mapValue(0, imgSize, -res/2, res/2, yCoordinate)
+
+            console.log("offset: " + xCoordinate + ", "+yCoordinate)
+
 
             xoffs = mapValue(-res/2, res/2, -zoom+xoffs, zoom+xoffs, xCoordinate)
             yoffs = mapValue(-res/2, res/2, -zoom+yoffs, zoom+yoffs, yCoordinate)
@@ -64,8 +65,6 @@
 
             setimg.src = imgURL()
         }
-
-
 
     </script>
 

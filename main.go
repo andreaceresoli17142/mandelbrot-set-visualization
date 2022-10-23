@@ -30,6 +30,16 @@ func calcColor(col uint64) color.RGBA {
 	return rgb
 }
 
+func ZtoN(Za float64, Zb float64, n int) (float64, float64) {
+
+	oldZa, oldZb := Za, Zb
+
+	for i := 1; i < n; i++ {
+		Za, Zb = (Za*oldZa)-(oldZb*Zb), (Za*Zb)+(oldZa*oldZb)
+	}
+	return Za, Zb
+}
+
 func mapValue(imin float64, imax float64, omin float64, omax float64, value float64) float64 {
 	//fmt.Printf("(%v - %v) / (%v - %v)\n", value, imin, imax, imin)
 	x := (value - imin) / (imax - imin)
@@ -61,6 +71,8 @@ func calculate_pixel(img *image.RGBA, res int, x int, y int) {
 	var i int
 
 	for Za*Za+Zb*Zb < 4 && i < iter {
+		//Za, Zb = ZtoN(Za, Zb, 3)
+		//Za, Zb = Za+Ca, Zb+Cb
 		Za, Zb = (Za*Za)-(Zb*Zb)+Ca, (2*Za*Zb)+Cb
 		i++
 	}
