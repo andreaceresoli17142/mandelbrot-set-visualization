@@ -12,11 +12,12 @@ import (
 )
 
 var (
-	res     = 1000
-	zoom    = 0.05
-	xoffset = 0.4
-	yoffset = 0.37
-	iter    = 1000
+	res       = 1000
+	zoom      = 0.05
+	xoffset   = 0.4
+	yoffset   = 0.37
+	iter      = 1000
+	multiBrot = 2
 )
 
 func calcColor(col uint64) color.RGBA {
@@ -30,14 +31,14 @@ func calcColor(col uint64) color.RGBA {
 	return rgb
 }
 
-func ZtoN(Za float64, Zb float64, n int) (float64, float64) {
+func CtoN(Z complex128, n int) complex128 {
 
-	oldZa, oldZb := Za, Zb
+	origZ := Z
 
 	for i := 1; i < n; i++ {
-		Za, Zb = (Za*oldZa)-(oldZb*Zb), (Za*Zb)+(oldZa*oldZb)
+		Z *= origZ
 	}
-	return Za, Zb
+	return Z
 }
 
 func mapValue(imin float64, imax float64, omin float64, omax float64, value float64) float64 {
@@ -63,17 +64,27 @@ func calculate_pixel(img *image.RGBA, res int, x int, y int) {
 
 	//fmt.Println("starting to calculate: ", x, y)
 
-	Ca := float64(mapValue(float64(-res/2), float64(res/2-1), -zoom+xoffset, zoom+xoffset, float64(x)))
-	Cb := float64(mapValue(float64(-res/2), float64(res/2-1), -zoom+yoffset, zoom+yoffset, float64(y)))
+	real_n := float64(mapValue(float64(-res/2), float64(res/2-1), -zoom+xoffset, zoom+xoffset, float64(x)))
+	imaginary_n := float64(mapValue(float64(-res/2), float64(res/2-1), -zoom+yoffset, zoom+yoffset, float64(y)))
 
-	var Za, Zb float64
+	//Za := real_n
+	//Zb := imaginary_n
+	//Ca := real_n
+	//Cb := imaginary_n
 
+	var C = complex(real_n, imaginary_n)
+
+	var Z complex128
+	var Rho float64
 	var i int
 
-	for Za*Za+Zb*Zb < 4 && i < iter {
-		//Za, Zb = ZtoN(Za, Zb, 3)
-		//Za, Zb = Za+Ca, Zb+Cb
-		Za, Zb = (Za*Za)-(Zb*Zb)+Ca, (2*Za*Zb)+Cb
+	for Rho < 4.0 && i < iter {
+		//Za, Zb = (Za*Za)-(Zb*Zb)+Ca, (2*Za*Zb)+Cb
+		//Rho = (Za * Za) - (Zb * Zb)
+
+		//Z = Z*Z + C
+		Z = CtoN(Z, multiBrot) + C
+		Rho = real(Z)
 		i++
 	}
 
@@ -132,17 +143,12 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("ofx: ", -zoom+yoffset, zoom+yoffset)
 
 	start := time.Now()
-
-	//iter = int(mapValue(1, 0, 0, 1000, zoom))
-
+	var nsPerPixel int64
 	for y := -res / 2; y < res/2; y++ {
 		for x := -res / 2; x < res/2; x++ {
-			//col := calcColor(uint64(mapValue(0, float64(res*res), 0, math.Pow(2, 64), float64(x*y))))
-
-			/*
-				f(z) = z^2 + C
-			*/
+			pxls := time.Now().UnixNano()
 			calculate_pixel(img, res, x, y)
+			nsPerPixel += time.Now().UnixNano() - pxls
 		}
 
 		// print progress bar
@@ -169,6 +175,7 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 	png.Encode(w, img)
 
 	fmt.Printf("\nset generation took %v\n", time.Since(start))
+	fmt.Printf("\nmedian pixel generation time %v ns\n", nsPerPixel/int64(res*res))
 }
 
 func main() {
