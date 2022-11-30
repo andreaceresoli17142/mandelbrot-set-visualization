@@ -13,11 +13,12 @@ import (
 )
 
 type pixelRequest struct {
-	wg  *sync.WaitGroup
-	Img *image.RGBA
-	Res int
-	X   int
-	Y   int
+	wg   *sync.WaitGroup
+	Img  *image.RGBA
+	Res  int
+	X    int
+	Y    int
+	Poly int
 }
 
 var (
@@ -26,7 +27,6 @@ var (
 	xoffset   = 0.4
 	yoffset   = 0.37
 	iter      = 1000
-	multiBrot = 2
 	threadsN  = 300
 	compCount = 0
 	queues    = make([]chan pixelRequest, threadsN)
@@ -72,17 +72,13 @@ func uint8Clamper(mini float64, maxi float64, value float64) uint8 {
 	return uint8(mapValue(mini, maxi, 0, 256, value))
 }
 
-func calculate_pixel(wg *sync.WaitGroup, img *image.RGBA, res int, x int, y int) {
-
-	//fmt.Println("starting to calculate: ", x, y)
+/*
+	calculate a single pixel
+*/
+func calculate_pixel(wg *sync.WaitGroup, img *image.RGBA, res int, x int, y int, multiBrot int) {
 
 	real_n := float64(mapValue(float64(-res/2), float64(res/2-1), -zoom+xoffset, zoom+xoffset, float64(x)))
 	imaginary_n := float64(mapValue(float64(-res/2), float64(res/2-1), -zoom+yoffset, zoom+yoffset, float64(y)))
-
-	//Za := real_n
-	//Zb := imaginary_n
-	//Ca := real_n
-	//Cb := imaginary_n
 
 	var C = complex(real_n, imaginary_n)
 
@@ -91,10 +87,6 @@ func calculate_pixel(wg *sync.WaitGroup, img *image.RGBA, res int, x int, y int)
 	var i int
 
 	for Rho < 4.0 && i < iter {
-		//Za, Zb = (Za*Za)-(Zb*Zb)+Ca, (2*Za*Zb)+Cb
-		//Rho = (Za * Za) - (Zb * Zb)
-
-		//Z = Z*Z + C
 		Z = CtoN(Z, multiBrot) + C
 		Rho = real(Z)
 		i++
@@ -111,13 +103,20 @@ func calculate_pixel(wg *sync.WaitGroup, img *image.RGBA, res int, x int, y int)
 	(*wg).Done()
 }
 
+/*
+	serve the loading image
+*/
 func loadingImage(w http.ResponseWriter, r *http.Request) {
 	ret, _ := os.ReadFile("loading.png")
 	w.Write(ret)
 }
 
+/*
+	serves the image
+*/
 func pageImage(w http.ResponseWriter, r *http.Request) {
 
+	polyi := r.URL.Query().Get("poly")
 	rest := r.URL.Query().Get("res")
 	rzoom := r.URL.Query().Get("zoom")
 	rxoffs := r.URL.Query().Get("xoffs")
@@ -125,7 +124,12 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 
 	var wg sync.WaitGroup
 
-	if rest == "" || rzoom == "" || rxoffs == "" || ryoffs == "" {
+	if polyi == "" || rest == "" || rzoom == "" || rxoffs == "" || ryoffs == "" {
+		return
+	}
+
+	poly, err := strconv.Atoi(polyi)
+	if err != nil {
 		return
 	}
 
@@ -157,20 +161,17 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("ofx: ", -zoom+yoffset, zoom+yoffset)
 
 	start := time.Now()
-	//var nsPerPixel int64
 	var c int
 	for y := -res / 2; y < res/2; y++ {
 		for x := -res / 2; x < res/2; x++ {
-			//pxls := time.Now().UnixNano()
-			//calculate_pixel(&wg, img, res, x, y)
-			//nsPerPixel += time.Now().UnixNano() - pxls
 			wg.Add(1)
 			go sendChan(queues[c%threadsN], pixelRequest{
-				wg:  &wg,
-				Img: img,
-				Res: res,
-				X:   x,
-				Y:   y,
+				wg:   &wg,
+				Img:  img,
+				Res:  res,
+				X:    x,
+				Y:    y,
+				Poly: poly,
 			})
 			c++
 		}
@@ -201,28 +202,34 @@ func pageImage(w http.ResponseWriter, r *http.Request) {
 	png.Encode(w, img)
 
 	fmt.Printf("\nset generation took %v\n", time.Since(start))
-	//fmt.Printf("\nmedian pixel generation time %v ns\n", nsPerPixel/int64(res*res))
 }
 
+/*
+	processor code
+	waits until a requst is sent through the channel then processes the pixel
+*/
 func listenChan(queue chan pixelRequest) {
 	for {
 		req := <-queue
-		calculate_pixel(req.wg, req.Img, req.Res, req.X, req.Y)
+		calculate_pixel(req.wg, req.Img, req.Res, req.X, req.Y, req.Poly)
 	}
 }
 
+// send pixel to process to a processor queue
 func sendChan(channel chan pixelRequest, data pixelRequest) {
 	channel <- data
 }
 
 func main() {
 
+	// start pixel processing threads
 	for i := 0; i < threadsN; i++ {
 		queues[i] = make(chan pixelRequest)
 		go listenChan(queues[i])
 	}
 
-	go http.HandleFunc("/", pageMain)
+	// start webserver
+	http.HandleFunc("/", pageMain)
 	http.HandleFunc("/mandelbrot.png", pageImage)
 	http.HandleFunc("/loading.png", loadingImage)
 	fmt.Println("Listening on http://localhost:3000/")

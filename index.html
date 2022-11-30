@@ -13,14 +13,16 @@
 
 <body>
     <script>
-        var res = 4000
+        var res = 1000
         var zoom = 1
         var xoffs = -0.5
         var yoffs = 0
+        poly = 2
         var setimg
         var loadFlag = false
 
         window.onload = () => {
+            poly = prompt('select polynome; ');
             setimg = document.getElementById("set_img")
             setimg.src = imgURL()
             setimg.onload = () => {
@@ -29,7 +31,7 @@
         }
 
         function imgURL() {
-            return "/mandelbrot.png?res="+res+"&zoom="+zoom+"&xoffs="+xoffs+"&yoffs="+yoffs
+            return "/mandelbrot.png?poly="+poly+"&res="+res+"&zoom="+zoom+"&xoffs="+xoffs+"&yoffs="+yoffs
         }
 
         function mapValue( imin, imax, omin, omax, value ) {
